@@ -56,21 +56,21 @@ snapshot_dt = stop_sim_time/1000
 ######### SIMULATION CODE ##########################################################
 
 # Create bases and domain
-coords = d3.CartesianCoordinates('s', 'z')
+coords = d3.CartesianCoordinates('z', 's') # Fourier direction comes first, for parallelization
 dist = d3.Distributor(coords, dtype=np.float64)
 sbasis = d3.Chebyshev(coords['s'], ns, bounds=(0, Ls), dealias=3/2)
 zbasis = d3.RealFourier(coords['z'], nz, bounds=(-Lz/2-w, Lz/2+w), dealias=3/2)
-sgrid, zgrid = dist.local_grids(sbasis, zbasis)
+zgrid, sgrid = dist.local_grids(zbasis, sbasis)
 
 # Fields
 s = dist.Field(name='s', bases=sbasis)
 s['g'] = sgrid
 z = dist.Field(name='z', bases=zbasis)
 z['g'] = zgrid
-p = dist.Field(name='p', bases=(sbasis,zbasis))
-us = dist.Field(name='us', bases=(sbasis,zbasis))
-uphi = dist.Field(name='uphi', bases=(sbasis,zbasis))
-uz = dist.Field(name='uz', bases=(sbasis,zbasis))
+p = dist.Field(name='p', bases=(zbasis,sbasis))
+us = dist.Field(name='us', bases=(zbasis,sbasis))
+uphi = dist.Field(name='uphi', bases=(zbasis,sbasis))
+uz = dist.Field(name='uz', bases=(zbasis,sbasis))
 t = dist.Field()
 
 # Boundary forcing
@@ -79,7 +79,7 @@ DelOmega = DelOmega_func(t)
 # Substitutions
 ds = lambda A: d3.Differentiate(A, coords['s'])
 dz = lambda A: d3.Differentiate(A, coords['z'])
-tank_integ = lambda A: 2*np.pi*d3.Integrate(s*A, ('s','z'))
+tank_integ = lambda A: 2*np.pi*d3.Integrate(s*A, ('z','s'))
 Vol = np.pi*Ls**2*(Lz+2*w)
 tank_avg = lambda A: 1/Vol * tank_integ(A)
 integ_z = lambda A: d3.Integrate(A, ('z'))

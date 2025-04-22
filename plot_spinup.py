@@ -61,14 +61,14 @@ uz_maxes = []
 for filename in data_files:
     with h5py.File(filename, mode='r') as f:
         if filename == data_files[0]:
-            s_data = f['tasks']['uphi'].dims[1][0][:]
-            z_data = f['tasks']['uphi'].dims[2][0][:]
+            s_data = f['tasks']['uphi'].dims[2][0][:]
+            z_data = f['tasks']['uphi'].dims[1][0][:]
 
-            ss_data = np.outer(s_data,np.ones(len(z_data)))
-            zz_data = np.outer(np.ones(len(s_data)),z_data)
+            ss_data = np.outer(np.ones(len(z_data)),s_data)
+            zz_data = np.outer(z_data,np.ones(len(s_data)))
 
-            ss_reg = np.outer(np.linspace(s_data[0],s_data[-1],params['ns']),np.ones(params['nz']))
-            zz_reg = np.outer(np.ones(params['ns']),np.linspace(z_data[0],z_data[-1],params['nz']))
+            ss_reg = np.outer(np.ones(params['nz']),np.linspace(s_data[0],s_data[-1],params['ns']))
+            zz_reg = np.outer(np.linspace(z_data[0],z_data[-1],params['nz']),np.ones(params['ns']))
 
         uphi_rel_maxes = []
         for it in range(0,f['tasks']['DelOmega'].shape[0],strd):
@@ -123,11 +123,11 @@ for filename in data_files:
         
             t_data = f['tasks']['E_phi'].dims[0]['sim_time'][it]
 
-            us_interp_fxn = RegularGridInterpolator((s_data,z_data),us_data, bounds_error=False)
-            us_reg = us_interp_fxn((ss_reg,zz_reg))
+            us_interp_fxn = RegularGridInterpolator((z_data,s_data),us_data, bounds_error=False)
+            us_reg = us_interp_fxn((zz_reg,ss_reg))
 
-            uz_interp_fxn = RegularGridInterpolator((s_data,z_data),uz_data, bounds_error=False)
-            uz_reg = uz_interp_fxn((ss_reg,zz_reg))
+            uz_interp_fxn = RegularGridInterpolator((z_data,s_data),uz_data, bounds_error=False)
+            uz_reg = uz_interp_fxn((zz_reg,ss_reg))
 
             fig, axs = plt.subplot_mosaic([['time','field'],['prof','field']],figsize=(7.5,5))
             
@@ -138,14 +138,14 @@ for filename in data_files:
             
             pm = axs['field'].pcolormesh(ss_data,zz_data,(uphi_data - DelOmega_data*ss_data),cmap='RdBu_r',vmin=(-rel_uphi_max,rel_uphi_max))
             plt.colorbar(pm,ax=axs['field'],extend='both',label=r"$u_\phi/(\Omega H)$")
-            axs['field'].quiver(ss_reg[::s_quivstrd,::z_quivstrd],zz_reg[::s_quivstrd,::z_quivstrd],us_reg[::s_quivstrd,::z_quivstrd],uz_reg[::s_quivstrd,::z_quivstrd],scale=np.sqrt(us_max**2+uz_max**2)*10)
+            axs['field'].quiver(ss_reg[::z_quivstrd,::s_quivstrd],zz_reg[::z_quivstrd,::s_quivstrd],us_reg[::z_quivstrd,::s_quivstrd],uz_reg[::z_quivstrd,::s_quivstrd],scale=np.sqrt(us_max**2+uz_max**2)*10)
             axs['field'].axhline(params['Lz']/2,color='k')
             axs['field'].axhline(-params['Lz']/2,color='k')
             axs['field'].set_aspect(1)
             axs['field'].set_xlabel(r'$s/H$')
             axs['field'].set_ylabel(r'$z/H$')
 
-            axs['prof'].plot(s_data,(uphi_data - DelOmega_data*ss_data)[:,np.argmin(np.abs(z_data))])
+            axs['prof'].plot(s_data,(uphi_data - DelOmega_data*ss_data)[np.argmin(np.abs(z_data)),:])
             axs['prof'].set_ylim(-rel_uphi_max,rel_uphi_max)
             axs['prof'].grid()
             axs['prof'].set_xlabel(r'$s/H$')
