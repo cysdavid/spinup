@@ -14,28 +14,46 @@ import pathlib
 rank = MPI.COMM_WORLD.rank
 size = MPI.COMM_WORLD.size
 
+######### PARAMETERS ###############################################################
+
 # Simulation name
-sim_name = 'sim4'
+sim_name = 'sim0'
 
 # Numerical Parameters
-ns, nz = (256,512)
+ns, nz = (128,256)
 dealias = 3/2
 dtype = np.float64
 timestepper = d3.RK443 #d3.RK222
 
 # Physical parameters
-Ek = 1e-3
-PeakOmega = 0.1
-Lz = 1
-Ls = 0.5
-w = 0.1 # tank wall thickness
-eta = 3e-4  # Volume penalty damping timescale
+Ek = 1e-1 # Ekman number, Ek = nu/(Omega*H**2)
+PeakOmega = 0.1 # Maximum (absolute) change in rotation rate
+Lz = 1 # height of cylinder
+Ls = 0.5 # radius of cylinder
+w = 0.1 # thickness of top and bottom "lids"
+eta = 3e-4  # Volume penalty damping timescale (enforces no-slip at top and bottom), 
+            # set eta << 1 or eta < Ek to be safe
+
+# Boundary forcing function, i.e., how the tank rotation rate should vary with time, t
+# Examples:
+
+## Spin-down/up:
+# delay = 1e-2
+# DelOmega_func = lambda t : PeakOmega * (0.5*(1 + np.tanh((2*(-2*delay + t))/delay)))
+
+## Spin-down then spin-up:
+DelOmega_func = lambda t : PeakOmega * -1/np.cosh((t - 0.05)/0.005)
+
+## Write your own function:
+# DelOmega_func = lambda t : <your function of t>
 
 # Cadences and stop time
-timestep = 5e-6
+timestep = 1e-4
 output_cadence = 10
 stop_sim_time = 0.1
 snapshot_dt = stop_sim_time/1000
+
+######### SIMULATION CODE ##########################################################
 
 # Create bases and domain
 coords = d3.CartesianCoordinates('s', 'z')
@@ -56,15 +74,6 @@ uz = dist.Field(name='uz', bases=(sbasis,zbasis))
 t = dist.Field()
 
 # Boundary forcing
-# Examples
-
-## Spin-down/up:
-# delay = 1e-2
-# DelOmega_func = lambda tt : PeakOmega * (0.5*(1 + np.tanh((2*(-2*delay + tt))/delay)))
-
-## Spin-down then spin-up:
-DelOmega_func = lambda tt : PeakOmega * -1/np.cosh((tt - 0.05)/0.005)
-
 DelOmega = DelOmega_func(t)
 
 # Substitutions
@@ -94,7 +103,6 @@ Kceil = dist.Field(name='Kceil', bases=(zbasis))
 Kfloor = dist.Field(name='Kfloor', bases=(zbasis))
 Kceil['g'] = mask(-(zgrid - (Lz/2))/delta)
 Kfloor['g'] = mask((zgrid - (-Lz/2))/delta)
-
 
 # Problem
 problem = d3.IVP([p, us, uphi, uz, tau_p, tau_us2, tau_uphi2, tau_uz2], time=t, namespace=locals())
@@ -142,7 +150,6 @@ if rank == 0:
 
 # Analysis
 snapshots = solver.evaluator.add_file_handler(str(save_data_path), sim_dt=snapshot_dt, max_writes=1000)
-# snapshots.add_tasks(solver.state)
 snapshots.add_task(us)
 snapshots.add_task(uphi)
 snapshots.add_task(uz)
@@ -161,6 +168,7 @@ static_fields.add_task(Kfloor)
 flow = d3.GlobalFlowProperty(solver, cadence=output_cadence)
 flow.add_property(np.abs(uphi), name='abs_uphi')
 flow.add_property(np.abs(uz), name='abs_uz')
+flow.add_property(np.abs(p), name='abs_p')
 
 # Main loop
 try:
@@ -169,7 +177,7 @@ try:
         solver.step(timestep)
         if (solver.iteration-1) % output_cadence == 0:
             logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, timestep))
-            logger.info('Max |uphi| = {}, Max |uz| = {}'.format(flow.max('abs_uphi'), flow.max('abs_uz')))
+            logger.info('Max |uphi| = {}, Max |uz| = {}, Max |p| = {}'.format(flow.max('abs_uphi'), flow.max('abs_uz'), flow.max('abs_p')))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
