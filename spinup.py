@@ -15,26 +15,26 @@ rank = MPI.COMM_WORLD.rank
 size = MPI.COMM_WORLD.size
 
 # Simulation name
-sim_name = 'sim1'
+sim_name = 'sim4'
 
 # Numerical Parameters
-ns, nz = (256,512) #(128,256)
+ns, nz = (256,512)
 dealias = 3/2
 dtype = np.float64
 timestepper = d3.RK443 #d3.RK222
 
 # Physical parameters
-Ek = 0.1/4 #0.1
+Ek = 1e-3
 PeakOmega = 0.1
 Lz = 1
 Ls = 0.5
 w = 0.1 # tank wall thickness
-eta = 3e-4/4  # Volume penalty damping timescale
+eta = 3e-4  # Volume penalty damping timescale
 
 # Cadences and stop time
-timestep = 1e-5#1e-4
+timestep = 5e-6
 output_cadence = 10
-stop_sim_time = 0.1 #0.1
+stop_sim_time = 0.1
 snapshot_dt = stop_sim_time/1000
 
 # Create bases and domain
@@ -43,8 +43,6 @@ dist = d3.Distributor(coords, dtype=np.float64)
 sbasis = d3.Chebyshev(coords['s'], ns, bounds=(0, Ls), dealias=3/2)
 zbasis = d3.RealFourier(coords['z'], nz, bounds=(-Lz/2-w, Lz/2+w), dealias=3/2)
 sgrid, zgrid = dist.local_grids(sbasis, zbasis)
-# ss = np.outer(sgrid,np.ones(zgrid.shape[-1]))
-# zz = np.outer(np.ones(sgrid.shape[0]),zgrid)
 
 # Fields
 s = dist.Field(name='s', bases=sbasis)
