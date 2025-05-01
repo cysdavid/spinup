@@ -93,7 +93,7 @@ for k in range(len(subfiles)):
     vort_plot['g'] = vort_list[np.argmin(np.abs(m_list - m_slowest_decaying)),0]
 
     ## Change scales
-    scales = (32, 4)
+    scales = (max(1,256//nphi), max(1,256//ns))
     u_plot.change_scales(scales)
     vort_plot.change_scales(scales)
     phi_plot, s_plot = dist_plot.local_grids(disk_plot, scales=scales)
@@ -101,6 +101,10 @@ for k in range(len(subfiles)):
 
     ## Compute streamfunction: \boldsymbol{u} = \boldsymbol{\nabla} \times (-\psi \boldsymbol{e}_z)
     psi_plot = 1j*s_plot*u_plot['g'][1]/m_slowest_decaying
+
+    ## Phase shift
+    max_phi_idx = np.unravel_index(np.argmax(psi_plot.real), psi_plot.shape)[0]
+    phase_shift = (phi_plot[max_phi_idx,0]%(2*np.pi/m_slowest_decaying))/(2*np.pi/m_slowest_decaying) * 2*np.pi 
 
     # Plot
     shading = 'gouraud'
@@ -139,16 +143,16 @@ for k in range(len(subfiles)):
     axs['evals'].set_xlim(np.min(all_sigmas.real),xlim_r)
     axs['evals'].set_ylim(np.min(all_sigmas.imag),np.max(all_sigmas.imag))
 
-    axs['uphi'].pcolormesh(x, y, u_plot['g'][0].real, cmap=cmap, shading=shading)
+    axs['uphi'].pcolormesh(x, y, (np.exp(1j*phase_shift)*u_plot['g'][0]).real, cmap=cmap, shading=shading)
     axs['uphi'].set_title(r"$u_\phi$")
 
-    axs['us'].pcolormesh(x, y, u_plot['g'][1].real, cmap=cmap, shading=shading)
+    axs['us'].pcolormesh(x, y, (np.exp(1j*phase_shift)*u_plot['g'][1]).real, cmap=cmap, shading=shading)
     axs['us'].set_title(r"$u_s$")
 
-    axs['vort'].pcolormesh(x, y, vort_plot['g'].real, cmap=cmap, shading=shading)
+    axs['vort'].pcolormesh(x, y, (np.exp(1j*phase_shift)*vort_plot['g']).real, cmap=cmap, shading=shading)
     axs['vort'].set_title(r"$\omega$")
 
-    axs['psi'].pcolormesh(x, y, psi_plot.real, cmap=cmap, shading=shading)
+    axs['psi'].pcolormesh(x, y, (np.exp(1j*phase_shift)*psi_plot).real, cmap=cmap, shading=shading)
     axs['psi'].set_title(r"$\psi$")
 
     for key in ['uphi','us','vort','psi']:

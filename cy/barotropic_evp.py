@@ -14,10 +14,10 @@ from scipy import interpolate
 
 ######### PARAMETERS ###############################################################
 
-sim_name = 'sim5' # name of axismmetric IVP simulation from which to take base flow
+sim_name = 'sim0' # name of axismmetric IVP simulation from which to take base flow
 evp_basename = 'evp0' # Change this if you change any of the parameters below
 strd = 40 # How often to import snapshots of uphi0 from the axisymmetric IVP (e.g. strd=2 means every other snapshots)
-Ek_override = 1e-5 # If not None, will override the value of Ek from the IVP
+Ek_override = None # If not None, will override the value of Ek from the IVP
 M = 6 # Max azimuthal order
 ns = 128 # Number of radial grid points
 
