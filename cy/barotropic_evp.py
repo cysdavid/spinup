@@ -14,11 +14,11 @@ from scipy import interpolate
 
 ######### PARAMETERS ###############################################################
 
-sim_name = 'sim0' # name of axismmetric IVP simulation from which to take base flow
-evp_basename = 'evp0' # Change this if you change any of the parameters below
-strd = 40 # How often to import snapshots of uphi0 from the axisymmetric IVP (e.g. strd=2 means every other snapshots)
-Ek_override = None # If not None, will override the value of Ek from the IVP
-M = 6 # Max azimuthal order
+sim_name = 'sim9' # name of axismmetric IVP simulation from which to take base flow
+evp_basename = 'evp3' # Change this if you change any of the parameters below
+strd = 4 # How often to import snapshots of uphi0 from the axisymmetric IVP (e.g. strd=2 means every other snapshots)
+Ek_override = 5e-5 # If not None, will override the value of Ek from the IVP
+M = 8 # Max azimuthal order
 ns = 128 # Number of radial grid points
 
 ######### EIGENVALUE PROBLEM CODE #####################################################
@@ -134,6 +134,11 @@ for filename in data_files:
                 u_list[i,j] = np.copy(u['g'])
                 p_list[i,j] = np.copy(p['g'])
                 vort_list[i,j] = np.copy(vort['g'])
+
+        # Print slowest decaying mode
+        m_slowest_decaying = m_list[m_list>0][np.argmax(sigma_list[:,0].real[m_list>0])]
+        sigma_slowest_decaying = sigma_list[np.argmin(np.abs(m_list - m_slowest_decaying)),0]
+        print(f"Slowest decaying mode: m = {m_slowest_decaying}, sigma = {sigma_slowest_decaying:.2f}")
 
         # Save at each point in time
         each_save_dict = {'write_num': write_num, 't': t_data, 'Omega': 1+DelOmega_data, 's': s_grid[0,:], 'phi': phi_grid[:,0], 'uphi0': Uphi0['g'][0][0].real, 'm': m_list, 'sigma': sigma_list, 'p': p_list, 'u': u_list, 'vort': vort_list, 'params': params_evp}

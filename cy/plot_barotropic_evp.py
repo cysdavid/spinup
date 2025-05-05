@@ -107,7 +107,7 @@ for k in range(len(subfiles)):
     phase_shift = (phi_plot[max_phi_idx,0]%(2*np.pi/m_slowest_decaying))/(2*np.pi/m_slowest_decaying) * 2*np.pi 
 
     # Plot
-    shading = 'gouraud'
+    shading = 'nearest'#'gouraud'
     cmap = 'RdBu_r'
 
     fig, axs = plt.subplot_mosaic([['time','.','evals','.','t','t'],['time','b1','evals','b2','uphi','us'],['b3','b1','evals','b2','vort','psi'],['prof','b1','evals','b2','vort','psi']],width_ratios=[1,0.3,2,0.5,1.2,1.2],height_ratios=[0.1,1,0.3,1],figsize=(10,5))
