@@ -7,7 +7,6 @@ Usage:
 Options:
     --stride=<strd>  Interval of snapshots to plot [default: 1]
 """
-import dedalus.public as d3
 import h5py
 import json
 from docopt import docopt
