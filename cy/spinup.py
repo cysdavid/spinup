@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from dedalus.tools.parallel import Sync
 import pathlib
+import inspect
 
 rank = MPI.COMM_WORLD.rank
 size = MPI.COMM_WORLD.size
@@ -17,40 +18,39 @@ size = MPI.COMM_WORLD.size
 ######### PARAMETERS ###############################################################
 
 # Simulation name
-sim_name = 'sim0'
+sim_name = 'sim11'
 
 # Numerical Parameters
-ns, nz = (128,256)
+ns, nz = (512,2048) #(512,1024) #(128,256)
 dealias = 3/2
 dtype = np.float64
 timestepper = d3.RK443 #d3.RK222
 
 # Physical parameters
-Ek = 1e-1 # Ekman number, Ek = nu/(Omega*H**2)
-PeakOmega = 0.1 # Maximum (absolute) change in rotation rate
+Ek = 1e-4#5e-4#5e-4#1.9e-3 # Ekman number, Ek = nu/(Omega*H**2)
+PeakOmega = 1#0.5 # Maximum (absolute) change in rotation rate
 Lz = 1 # height of cylinder
 Ls = 0.5 # radius of cylinder
-w = 0.1 # thickness of top and bottom "lids"
-eta = 3e-4  # Volume penalty damping timescale (enforces no-slip at top and bottom), 
+w = 0.05 #0.1 # thickness of top and bottom "lids"
+eta = 5e-5#3e-4  # Volume penalty damping timescale (enforces no-slip at top and bottom), 
             # set eta << 1 or eta < Ek to be safe
 
 # Boundary forcing function, i.e., how the tank rotation rate should vary with time, t
 # Examples:
 
 ## Spin-down/up:
-# delay = 1e-2
-# DelOmega_func = lambda t : PeakOmega * (0.5*(1 + np.tanh((2*(-2*delay + t))/delay)))
+# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-2*1e-2 + t))/1e-2)))
 
 ## Spin-down then spin-up:
-DelOmega_func = lambda t : PeakOmega * -1/np.cosh((t - 0.05)/0.005)
+full_DelOmega_func = lambda t,PeakOmega : PeakOmega * -1/np.cosh((t - 0.02*10)/(0.005*10))
 
 ## Write your own function:
-# DelOmega_func = lambda t : <your function of t>
+# full_DelOmega_func = lambda t,PeakOmega : <your function of t>
 
 # Cadences and stop time
-timestep = 1e-4
+timestep = 1e-6#1e-7#5e-6#1e-5#5e-6#2e-5#5e-5
 output_cadence = 10
-stop_sim_time = 0.1
+stop_sim_time = 0.4#2#0.04*10
 snapshot_dt = stop_sim_time/1000
 
 ######### SIMULATION CODE ##########################################################
@@ -74,6 +74,7 @@ uz = dist.Field(name='uz', bases=(zbasis,sbasis))
 t = dist.Field()
 
 # Boundary forcing
+DelOmega_func = lambda t: full_DelOmega_func(t,PeakOmega)
 DelOmega = DelOmega_func(t)
 
 # Substitutions
@@ -137,10 +138,16 @@ with Sync() as sync:
 save_data_path = data_path.joinpath(sim_name)
 static_fields_path = save_data_path.joinpath('static_fields')
 save_params_path = params_path.joinpath(sim_name+".json")
+DelOmega_path = save_data_path.joinpath('DelOmega.py')
 
-# Save parameters
-# Ek, D, Lz, Ls, w, eta, switch_s, switch_phi, switch_z
 if rank == 0:
+    # Export function for change in rotation rate
+    with open(DelOmega_path, "w") as file:
+        file.write("import numpy as np\n")
+        file.write(inspect.getsource(full_DelOmega_func))
+
+    # Save parameters
+    # Ek, D, Lz, Ls, w, eta, switch_s, switch_phi, switch_z
     params_dict = {'ns':ns,'nz':nz,'timestep':timestep,
                    'Ek':Ek,'PeakOmega':PeakOmega,'Lz':Lz,'Ls':Ls,
                    'w':w,'eta':eta}
