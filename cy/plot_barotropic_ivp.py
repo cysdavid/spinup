@@ -1,5 +1,5 @@
 """
-Plot barotropic IVP data in inertial frame
+Plot barotropic IVP data in (rotating) tank frame (i.e., the frame rotating at Omega(t))
 
 Usage:
     plot_barotropic_ivp.py <sim_name> [--stride=<strd>]
@@ -62,7 +62,7 @@ for filename in data_files:
             t_arr.append(t_i)
             
             uphi_rel_maxes.append(np.nanmax(np.abs(f['tasks']['u'][it][0] - (Omega_i*ss_data))))
-            file_vort_maxes.append(np.nanquantile(np.abs(f['tasks']['vort'][it]),q=vort_quant))
+            file_vort_maxes.append(np.nanquantile(np.abs(f['tasks']['vort'][it] - Omega_i),q=vort_quant))
 
         file_uphi_rel_max = np.nanmax(uphi_rel_maxes)
         file_uphi_max = np.nanmax(np.abs(f['tasks']['u'][::strd,0]))
@@ -73,16 +73,17 @@ for filename in data_files:
         us_maxes.append(file_us_max)
         vort_maxes.append(file_vort_max)
 
-Omega_arr = np.array(Omega_arr)
+Omega_arr = np.array(Omega_arr).flatten()
 t_arr = np.array(t_arr)
 rel_uphi_max = np.max(rel_uphi_maxes)
 uphi_max = np.max(uphi_maxes)
 us_max = np.max(us_maxes)
 vort_max = np.quantile(vort_maxes,q=vort_quant)
 
-# Make Cartesian grid
-x = ss_data * np.cos(phiphi_data)
-y = ss_data * np.sin(phiphi_data)
+# Compute phase shift from inertial to Omega(t) frame
+theta_arr = np.zeros(len(Omega_arr))
+for i in range(len(Omega_arr)-1):
+    theta_arr[i+1] = theta_arr[i] + Omega_arr[i]*(params["Ek"]**(-1/2))*(t_arr[i+1] - t_arr[i])
 
 # Create output directory if needed
 frame_path = pathlib.Path('frames').absolute()
@@ -97,6 +98,7 @@ if rank == 0:
 
     print("Plotting...")
 
+cmap = 'RdBu_r'
 # Import data and plot
 for filename in data_files:
     with h5py.File(filename, mode='r') as f:
@@ -109,18 +111,23 @@ for filename in data_files:
             p_data = f['tasks']['p'][it]
             t_data = f['tasks']['u'].dims[0]['sim_time'][it]
 
+            # Make Cartesian grid
+            theta = theta_arr[np.argmin(np.abs(t_arr - t_data))] # Get angle shift from inertial to tank frame
+            x = ss_data * np.cos(phiphi_data - theta)
+            y = ss_data * np.sin(phiphi_data - theta)
+
             fig, axs = plt.subplot_mosaic([['time','field','vort']],figsize=(1*7.5,5/2))
             axs['time'].plot(t_arr,Omega_arr)
             axs['time'].scatter(t_data,Omega_data)
             axs['time'].set_ylabel(r"$\Omega(t)/\Omega_0$")
             axs['time'].set_xlabel(r"$t \sqrt{\nu \Omega_0}/H$")
 
-            axs['field'].pcolormesh(x, y, u_data[1], cmap='RdBu_r', vmin=(-us_max,us_max))
+            axs['field'].pcolormesh(x, y, u_data[1], cmap=cmap, vmin=(-us_max,us_max))
             axs['field'].set_aspect('equal')
             axs['field'].set_axis_off()
             axs['field'].set_title(r"$u_s$")
 
-            axs['vort'].pcolormesh(x, y, vort_data, cmap='RdBu_r', vmin=(-vort_max,vort_max))
+            axs['vort'].pcolormesh(x, y, vort_data - Omega_data, cmap=cmap, vmin=(-vort_max,vort_max))
             axs['vort'].set_aspect('equal')
             axs['vort'].set_axis_off()
             axs['vort'].set_title(r"$\omega$")
