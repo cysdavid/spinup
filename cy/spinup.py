@@ -18,39 +18,40 @@ size = MPI.COMM_WORLD.size
 ######### PARAMETERS ###############################################################
 
 # Simulation name
-sim_name = 'sim11'
+sim_name = 'sim13'
 
 # Numerical Parameters
-ns, nz = (512,2048) #(512,1024) #(128,256)
+ns, nz = (256,512)
 dealias = 3/2
 dtype = np.float64
 timestepper = d3.RK443 #d3.RK222
 
 # Physical parameters
-Ek = 1e-4#5e-4#5e-4#1.9e-3 # Ekman number, Ek = nu/(Omega*H**2)
-PeakOmega = 1#0.5 # Maximum (absolute) change in rotation rate
+Ek = 1e-3 # Ekman number, Ek = nu/(Omega*H**2)
+PeakOmega = -1 # Maximum (absolute) change in rotation rate
 Lz = 1 # height of cylinder
-Ls = 0.5 # radius of cylinder
+Ls = 1.5 # radius of cylinder
 w = 0.05 #0.1 # thickness of top and bottom "lids"
-eta = 5e-5#3e-4  # Volume penalty damping timescale (enforces no-slip at top and bottom), 
+eta = 3e-4  # Volume penalty damping timescale (enforces no-slip at top and bottom), 
             # set eta << 1 or eta < Ek to be safe
+perturbation_amp = 1e-4 # RMSE amplitude of us, uz noise
 
 # Boundary forcing function, i.e., how the tank rotation rate should vary with time, t
 # Examples:
 
-## Spin-down/up:
-# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-2*1e-2 + t))/1e-2)))
+## Spin-down:
+full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-1e-2 + t))/5e-3)))
 
 ## Spin-down then spin-up:
-full_DelOmega_func = lambda t,PeakOmega : PeakOmega * -1/np.cosh((t - 0.02*10)/(0.005*10))
+# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * -1/np.cosh((t - 0.02*10)/(0.005*10))
 
 ## Write your own function:
 # full_DelOmega_func = lambda t,PeakOmega : <your function of t>
 
 # Cadences and stop time
-timestep = 1e-6#1e-7#5e-6#1e-5#5e-6#2e-5#5e-5
+timestep = 1e-5
 output_cadence = 10
-stop_sim_time = 0.4#2#0.04*10
+stop_sim_time = 0.4
 snapshot_dt = stop_sim_time/1000
 
 ######### SIMULATION CODE ##########################################################
@@ -105,6 +106,19 @@ Kfloor = dist.Field(name='Kfloor', bases=(zbasis))
 Kceil['g'] = mask(-(zgrid - (Lz/2))/delta)
 Kfloor['g'] = mask((zgrid - (-Lz/2))/delta)
 
+# Initial condition: incompressible noise in us, uz
+psi = dist.Field(name='psi', bases=(zbasis,sbasis))
+psi.fill_random('g', seed=42, distribution='normal')
+psi.low_pass_filter(scales=0.25)
+psi['g'] = (psi * s/Ls * np.tanh(-(s - Ls)/0.1) * (1-(Kceil+Kfloor)))['g']
+us.change_scales(dealias)
+uz.change_scales(dealias)
+us['g'] = (dz(psi))['g']
+uz['g'] = (-psi/s- ds(psi))['g']
+ubot_rmse = np.sqrt(tank_avg(us**2 + uz**2))
+us['g'] = (us * 1/ubot_rmse * perturbation_amp)['g']
+uz['g'] = (uz * 1/ubot_rmse * perturbation_amp)['g']
+
 # Problem
 problem = d3.IVP([p, us, uphi, uz, tau_p, tau_us2, tau_uphi2, tau_uz2], time=t, namespace=locals())
 ## Equations
@@ -129,28 +143,28 @@ solver.stop_sim_time = stop_sim_time
 # Create data and params directories if needed
 data_path = pathlib.Path('data').absolute()
 params_path = pathlib.Path('params').absolute()
-with Sync() as sync:
-    if sync.comm.rank == 0:
-        if not data_path.exists():
-            data_path.mkdir()
-        if not params_path.exists():
-            params_path.mkdir()
 save_data_path = data_path.joinpath(sim_name)
 static_fields_path = save_data_path.joinpath('static_fields')
 save_params_path = params_path.joinpath(sim_name+".json")
 DelOmega_path = save_data_path.joinpath('DelOmega.py')
-
 if rank == 0:
+    if not data_path.exists():
+        data_path.mkdir()
+    if not params_path.exists():
+        params_path.mkdir()
+    if not save_data_path.exists():
+        save_data_path.mkdir()
+
     # Export function for change in rotation rate
+    DelOmega_path.touch(exist_ok=True)
     with open(DelOmega_path, "w") as file:
         file.write("import numpy as np\n")
         file.write(inspect.getsource(full_DelOmega_func))
 
     # Save parameters
-    # Ek, D, Lz, Ls, w, eta, switch_s, switch_phi, switch_z
     params_dict = {'ns':ns,'nz':nz,'timestep':timestep,
                    'Ek':Ek,'PeakOmega':PeakOmega,'Lz':Lz,'Ls':Ls,
-                   'w':w,'eta':eta}
+                   'w':w,'eta':eta,'perturbation_amp':perturbation_amp}
     params_json = json.dumps(params_dict, indent = 4)
     with open(save_params_path, "w") as outfile: 
         outfile.write(params_json)

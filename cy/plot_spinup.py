@@ -138,7 +138,7 @@ for filename in data_files:
             uz_interp_fxn = RegularGridInterpolator((z_data,s_data),uz_data, bounds_error=False)
             uz_reg = uz_interp_fxn((zz_reg,ss_reg))
 
-            fig, axs = plt.subplot_mosaic([['time','field','vort'],['prof','field','vort']],figsize=(1.5*7.5,5))
+            fig, axs = plt.subplot_mosaic([['time','field','vort'],['prof','field','vort']],figsize=(0.5*7.5 + 15*params['Ls']/params['Lz'],5))
             
             axs['time'].plot(t_arr,1+DelOmega_arr)
             axs['time'].scatter(t_data,1+DelOmega_data)
