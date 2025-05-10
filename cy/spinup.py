@@ -18,16 +18,16 @@ size = MPI.COMM_WORLD.size
 ######### PARAMETERS ###############################################################
 
 # Simulation name
-sim_name = 'sim13'
+sim_name = 'sim14'
 
 # Numerical Parameters
-ns, nz = (256,512)
+ns, nz = (512,1024)
 dealias = 3/2
 dtype = np.float64
 timestepper = d3.RK443 #d3.RK222
 
 # Physical parameters
-Ek = 1e-3 # Ekman number, Ek = nu/(Omega*H**2)
+Ek = 5e-4 # Ekman number, Ek = nu/(Omega*H**2)
 PeakOmega = -1 # Maximum (absolute) change in rotation rate
 Lz = 1 # height of cylinder
 Ls = 1.5 # radius of cylinder
@@ -49,7 +49,7 @@ full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-1e-
 # full_DelOmega_func = lambda t,PeakOmega : <your function of t>
 
 # Cadences and stop time
-timestep = 1e-5
+timestep = 5e-6
 output_cadence = 10
 stop_sim_time = 0.4
 snapshot_dt = stop_sim_time/1000
