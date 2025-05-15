@@ -18,7 +18,7 @@ size = MPI.COMM_WORLD.size
 ######### PARAMETERS ###############################################################
 
 # Simulation name
-sim_name = 'sim20'
+sim_name = 'sim18'
 
 # Numerical Parameters
 ns, nz = (1024,2048) #(1024,1024)
@@ -44,10 +44,10 @@ free_surface = True # whether to impose a stress-free, no-penetration condition 
 # full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-1e-2 + t))/5e-3)))
 
 ## Spin-down then spin-up:
-# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
+full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
 
-## Spin-up then spin-down:
-full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (1 - 0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
+# ## Spin-up then spin-down:
+# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (1 - 0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
 
 ## Write your own function:
 # full_DelOmega_func = lambda t,PeakOmega : <your function of t>
@@ -55,7 +55,7 @@ full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (1 - 0.5*(np.tanh((2*(-1e-
 # Cadences and stop time
 timestep = 5e-6 #1e-5
 output_cadence = 10
-stop_sim_time = 0.3
+stop_sim_time = 0.4
 snapshot_dt = stop_sim_time/1000
 
 ######### SIMULATION CODE ##########################################################
@@ -116,7 +116,6 @@ ds_uphi = ds(uphi)
 ds_uz = ds(uz)
 
 # Initial condition: incompressible noise in us, uz
-uphi['g'] = np.outer(np.ones(nz),DelOmega_func(0)*sgrid)
 psi = dist.Field(name='psi', bases=(zbasis,sbasis))
 psi.fill_random('g', seed=42, distribution='normal')
 psi.low_pass_filter(scales=0.25)
