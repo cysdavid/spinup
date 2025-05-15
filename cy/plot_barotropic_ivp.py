@@ -35,6 +35,10 @@ data_files = natural_sort(glob.glob(str(save_data_path.joinpath('*.h5'))))
 with open(save_params_path) as f: 
     params = json.load(f)
 
+# Whether to plot tracer field
+if 'tracer' in params.keys():
+    plot_tracer = params['tracer']
+
 # Get time series and maxima
 vort_quant = 0.9
 
@@ -116,7 +120,23 @@ for filename in data_files:
             x = ss_data * np.cos(phiphi_data - theta)
             y = ss_data * np.sin(phiphi_data - theta)
 
-            fig, axs = plt.subplot_mosaic([['time','field','vort']],figsize=(1*7.5,5/2))
+            if plot_tracer:
+                c_data = f['tasks']['c'][it]
+                fig, axs = plt.subplot_mosaic([['time','field','vort','tracer']],figsize=(10,5/2))
+                axs['tracer'].pcolormesh(x, y, c_data, cmap=cmap, vmin=(0,1))
+                axs['tracer'].set_aspect('equal')
+                axs['tracer'].set_axis_off()
+                axs['tracer'].set_title("tracer")
+            else:
+                fig, axs = plt.subplot_mosaic([['time','field','vort']],figsize=(1*7.5,5/2))
+
+            # c_data = f['tasks']['c'][it]
+            # fig, axs = plt.subplot_mosaic([['time','field','vort','tracer']],figsize=(10,5/2))
+            # axs['tracer'].pcolormesh(x, y, c_data, cmap=cmap)
+            # axs['tracer'].set_aspect('equal')
+            # axs['tracer'].set_axis_off()
+            # axs['tracer'].set_title("tracer")
+
             axs['time'].plot(t_arr,Omega_arr)
             axs['time'].scatter(t_data,Omega_data)
             axs['time'].set_ylabel(r"$\Omega(t)/\Omega_0$")

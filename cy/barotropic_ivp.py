@@ -17,12 +17,16 @@ size = MPI.COMM_WORLD.size
 
 # File parameters
 evp_name = 'sim9_evp2' # name of axismmetric IVP simulation from which to take base flow
-bivp_basename = 'bivp0' # Change this if you change any of the parameters below
-ivp_write_num = 525
+bivp_basename = 'bivp3' # Change this if you change any of the parameters below
+ivp_write_num = 645#525
 
 # Physical parameters
 Ek_override = None # If not None, will override the value of Ek from the IVP
-perturbation_amp = 1e-3
+perturbation_amp = 1e-4
+tracer = False
+Sc = 1
+noise = True
+fastest_growing_mode = False
 
 # Numerical parameters
 nphi = 512 # Max azimuthal order
@@ -34,8 +38,8 @@ timestepper = d3.RK443
 # Cadences and stop time
 max_timestep = 2.5e-6
 output_cadence = 10
-stop_sim_time = "end" # If "end", uses the last timestamp in the EVP as the stopping time
-snapshot_dt_over_stop_sim_time = 1/1000
+stop_sim_time = 1.2 #"end" # If "end", uses the last timestamp in the EVP as the stopping time
+snapshot_dt_over_stop_sim_time = 1/3 * 1/1000
 
 ######### SIMULATION CODE ####################################################
 
@@ -107,10 +111,24 @@ u = dist.VectorField(coords, name='u', bases=disk)
 p = dist.Field(name='p', bases=disk)
 s = dist.Field(name='s', bases=disk.radial_basis)
 s['g'] = s_grid
+ses = dist.VectorField(coords, name='ses', bases=disk.radial_basis)
+ses['g'][1] = s_grid
 tau_u = dist.VectorField(coords, name='tau_u', bases=disk.edge)
 tau_p = dist.Field(name='tau_p')
 t = dist.Field()
 t['g'] = evp_dict['t']
+
+if tracer:
+    c = dist.Field(name='c', bases=disk)
+    tau_c = dist.Field(name='tau_c', bases=disk.edge)
+    ds = lambda A: 1/s*(d3.grad(A))@ses
+
+    ## Set tracer field initial condition
+    c.change_scales((u_pert.shape[1]/nphi,params_evp['ns']/ns))
+    c['g'] += evp_dict['uphi0'][rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
+    c.change_scales(1)
+    c['g'] += -s_grid
+    c['g'] = (c['g'] - np.min(c['g']))/(np.max(c['g']) - np.min(c['g']))
 
 ## Substitutions
 lift_basis = disk.derivative_basis(2)
@@ -118,11 +136,20 @@ lift = lambda A: d3.Lift(A, lift_basis, -1)
 avg = lambda A: 1/(np.pi*R**2)*d3.Integrate(A)
 
 ## Initial condition
+### Add random noise
+if noise:
+    u.fill_random('g', seed=42, distribution='standard_normal') # Random noise
+    u.low_pass_filter(scales=0.25) # Keep only lower fourth of the modes
+    u['g'] *= perturbation_amp
+### Add background azimuthal flow
 u.change_scales((u_pert.shape[1]/nphi,params_evp['ns']/ns))
 p.change_scales((u_pert.shape[1]/nphi,params_evp['ns']/ns))
-u['g'][0] = evp_dict['uphi0'][rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
-u['g'] += perturbation_amp * u_pert[:,:,rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
-p['g'] = perturbation_amp * p_pert[:,rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
+u['g'][0] += evp_dict['uphi0'][rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
+### Add first fastest growing mode from EVP
+if fastest_growing_mode:
+    u['g'][0] = evp_dict['uphi0'][rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
+    u['g'] += perturbation_amp * u_pert[:,:,rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
+    p['g'] = perturbation_amp * p_pert[:,rank*params_evp['ns']//size:(rank+1)*params_evp['ns']//size]
 
 u.change_scales(1)
 p.change_scales(1)
@@ -131,7 +158,13 @@ p.change_scales(1)
 Omega = Omega_func(t)
 
 ## Problem
-problem = d3.IVP([u, p, tau_u, tau_p], time=t, namespace=locals())
+if tracer:
+    problem = d3.IVP([u, p, c, tau_u, tau_p, tau_c], time=t, namespace=locals())
+    problem.add_equation("np.sqrt(Ek)*dt(c) - Ek/Sc*lap(c) + lift(tau_c) = - u@grad(c)")
+    problem.add_equation("ds(c)(s=R) = 0")
+else:
+    problem = d3.IVP([u, p, tau_u, tau_p], time=t, namespace=locals())
+
 problem.add_equation("div(u) + tau_p = 0")
 problem.add_equation("np.sqrt(Ek)*dt(u) + grad(p) - Ek*lap(u) + lift(tau_u) = - u@grad(u)")
 problem.add_equation("integ(p) = 0")
@@ -167,7 +200,8 @@ if rank == 0:
     # Save parameters
     params_dict = {'ns':ns,'nphi':nphi,'max_timestep':max_timestep,
                    'Ek':Ek,'PeakOmega':PeakOmega,'Ls':R, 'R':R,
-                   'perturbation_amp':perturbation_amp,
+                   'perturbation_amp':perturbation_amp, 'tracer':tracer, 'Sc':Sc,
+                   'noise':noise, 'fastest_growing_mode':fastest_growing_mode,
                    'ivp_write_num':ivp_write_num,'stop_sim_time':stop_sim_time}
     params_json = json.dumps(params_dict, indent = 4)
     with open(save_params_path, "w") as outfile: 
@@ -177,6 +211,8 @@ if rank == 0:
 snapshots = solver.evaluator.add_file_handler(str(save_data_path), sim_dt=snapshot_dt, max_writes=1000)
 snapshots.add_task(u)
 snapshots.add_task(p)
+if tracer:
+    snapshots.add_task(c)
 snapshots.add_task(Omega,name='Omega')
 snapshots.add_task(-d3.div(d3.skew(u)),name='vort')
 snapshots.add_task(0.5*avg(u@u),name='KE')
@@ -184,8 +220,10 @@ snapshots.add_task(0.5*avg(u@u),name='KE')
 # Flow properties
 flow = d3.GlobalFlowProperty(solver, cadence=100)
 flow.add_property(u@u, name='u2')
+flow.add_property(np.abs(u@ses), name='abs(us*s)')
 flow.add_property(np.abs(p), name='abs_p')
-
+if tracer:
+    flow.add_property(np.abs(c), name='abs_c')
 # Main loop
 try:
     logger.info('Starting main loop')
@@ -194,8 +232,13 @@ try:
         solver.step(timestep)
         if (solver.iteration-1) % output_cadence == 0:
             max_u = np.sqrt(flow.max('u2'))
-            max_p = np.sqrt(flow.max('abs_p'))
-            logger.info("Iteration=%i, Time=%e, dt=%e, max|u^2|=%e, max|p|=%e" %(solver.iteration, solver.sim_time, timestep, max_u, max_p))
+            max_p = flow.max('abs_p')
+            max_us_s = flow.max('abs(us*s)')
+            if tracer:
+                max_c = flow.max('abs_c')
+                logger.info("Iteration=%i, Time=%e, dt=%e, max|u^2|=%e, max|u_s*s|=%e, max|p|=%e, max|c|=%e" %(solver.iteration, solver.sim_time, timestep, max_u, max_us_s, max_p, max_c))
+            else:
+                logger.info("Iteration=%i, Time=%e, dt=%e, max|u^2|=%e, max|u_s*s|=%e, max|p|=%e" %(solver.iteration, solver.sim_time, timestep, max_u, max_us_s, max_p))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
