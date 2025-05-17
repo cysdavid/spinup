@@ -18,22 +18,23 @@ size = MPI.COMM_WORLD.size
 ######### PARAMETERS ###############################################################
 
 # Simulation name
-sim_name = 'sim18'
+sim_name = 'sim23'
 
 # Numerical Parameters
-ns, nz = (1024,2048) #(1024,1024)
+ns, nz = (1024,1024)
 dealias = 3/2
 dtype = np.float64
-timestepper = d3.RK222 #d3.RK443
+timestepper = d3.RK222
 
 # Physical parameters
-Ek = 1.25e-4 #5e-4 # Ekman number, Ek = nu/(Omega*H**2)
+Ek = 1.36e-4 # Ekman number, Ek = nu/(Omega*H**2)
 PeakOmega = -0.75 # Maximum (absolute) change in rotation rate
 Lz = 1 # height of cylinder
-Ls = 1.5 #3 # radius of cylinder
-w = 0.05 #0.1 # thickness of top and bottom "lids"
-eta = 3e-4  # Volume penalty damping timescale (enforces no-slip at top and bottom), 
-            # set eta << 1 or eta < Ek to be safe
+Ls = 9/4 # radius of cylinder
+w = 0.05  # thickness of top and bottom "lids"
+eta = 1e-2 # Volume penalty damping timescale (enforces no-slip at top and bottom), 
+            # eta * sqrt(Ek) = (dimensional damping timescale)/(H/sqrt(nu Omega_0))
+            # eta * sqrt(Ek) should be the fastest timescale in the system (e.g., faster than timescale over which Omega changes)
 perturbation_amp = 1e-4 # RMSE amplitude of us, uz noise
 free_surface = True # whether to impose a stress-free, no-penetration condition at z=0
 
@@ -44,18 +45,18 @@ free_surface = True # whether to impose a stress-free, no-penetration condition 
 # full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-1e-2 + t))/5e-3)))
 
 ## Spin-down then spin-up:
-full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
+full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.13))/(5e-3)))))
 
-# ## Spin-up then spin-down:
+## Spin-up then spin-down:
 # full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (1 - 0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
 
 ## Write your own function:
 # full_DelOmega_func = lambda t,PeakOmega : <your function of t>
 
 # Cadences and stop time
-timestep = 5e-6 #1e-5
+timestep = 5e-6 #3.2e-6 #5e-6#5e-6 #2.5e-6#5e-6 #1e-5
 output_cadence = 10
-stop_sim_time = 0.4
+stop_sim_time = 0.3
 snapshot_dt = stop_sim_time/1000
 
 ######### SIMULATION CODE ##########################################################
@@ -116,6 +117,7 @@ ds_uphi = ds(uphi)
 ds_uz = ds(uz)
 
 # Initial condition: incompressible noise in us, uz
+uphi['g'] = np.outer(np.ones(nz),DelOmega_func(0)*sgrid)
 psi = dist.Field(name='psi', bases=(zbasis,sbasis))
 psi.fill_random('g', seed=42, distribution='normal')
 psi.low_pass_filter(scales=0.25)
