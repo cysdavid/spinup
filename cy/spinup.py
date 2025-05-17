@@ -18,7 +18,7 @@ size = MPI.COMM_WORLD.size
 ######### PARAMETERS ###############################################################
 
 # Simulation name
-sim_name = 'sim23'
+sim_name = 'sim25'
 
 # Numerical Parameters
 ns, nz = (1024,1024)
@@ -45,10 +45,10 @@ free_surface = True # whether to impose a stress-free, no-penetration condition 
 # full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(1 + np.tanh((2*(-1e-2 + t))/5e-3)))
 
 ## Spin-down then spin-up:
-full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.13))/(5e-3)))))
+# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.13))/(5e-3)))))
 
 ## Spin-up then spin-down:
-# full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (1 - 0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.2))/(5e-3)))))
+full_DelOmega_func = lambda t,PeakOmega : PeakOmega * (1 - 0.5*(np.tanh((2*(-1e-2 + t))/5e-3) + np.tanh(-((2*(t - 0.13))/(5e-3)))))
 
 ## Write your own function:
 # full_DelOmega_func = lambda t,PeakOmega : <your function of t>
